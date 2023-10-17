@@ -20,7 +20,7 @@ x = Array.create('x', shape=1024, vartype='BINARY')
 ​
 # Hamiltonian for the objective function
 HZ = sum(0 * x for x in x)
-​
+​print(HZ)
 H = -1 * HZ 
 ​
 model = H.compile()
