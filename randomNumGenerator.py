@@ -77,7 +77,7 @@ def runsTest(dictionary):
     return pVal
 
 
-#third test
+#fourth test
 def spectralTest(dictionary):
     bin_data = ""
     for i in range(len(dictionary)):
@@ -99,8 +99,63 @@ def spectralTest(dictionary):
     count_n1 = len(numpy.where(modulus < tau)[0])
     # Calculate d and return the p value statistic
     d = (count_n1 - count_n0) / numpy.sqrt(n * 0.95 * 0.05 / 4)
-    p_val = math.erf(abs(d) / numpy.sqrt(2))
-    return p_val
+    pVal = math.erf(abs(d) / numpy.sqrt(2))
+    return pVal
+
+def longestRunTest(dictionary):
+    bin_data = ""
+    for i in range(len(dictionary)):
+        bin_data = bin_data + str(dictionary['x['+str(i)+']'])
+    if len(bin_data) < 128:
+        print("\t", "Not enough data to run test!")
+        return -1.0
+    elif len(bin_data) < 6272:
+        k, m = 3, 8
+        v_values = [1, 2, 3, 4]
+        pik_values = [0.21484375, 0.3671875, 0.23046875, 0.1875]
+    elif len(bin_data) < 75000:
+        k, m = 5, 128
+        v_values = [4, 5, 6, 7, 8, 9]
+        pik_values = [0.1174035788, 0.242955959, 0.249363483, 0.17517706, 0.102701071, 0.112398847]
+    else:
+        k, m = 6, 10000
+        v_values = [10, 11, 12, 13, 14, 15, 16]
+        pik_values = [0.0882, 0.2092, 0.2483, 0.1933, 0.1208, 0.0675, 0.0727]
+
+    # Work out the number of blocks, discard the remainder
+    # pik = [0.2148, 0.3672, 0.2305, 0.1875]
+    num_blocks = math.floor(len(bin_data) / m)
+    frequencies = numpy.zeros(k + 1)
+    block_start, block_end = 0, m
+    for i in range(num_blocks):
+        # Slice the binary string into a block
+        block_data = bin_data[block_start:block_end]
+        # Keep track of the number of ones
+        max_run_count, run_count = 0, 0
+        for j in range(0, m):
+            if block_data[j] == '1':
+                run_count += 1
+                max_run_count = max(max_run_count, run_count)
+            else:
+                max_run_count = max(max_run_count, run_count)
+                run_count = 0
+        max_run_count = max(max_run_count, run_count)
+        if max_run_count < v_values[0]:
+            frequencies[0] += 1
+        for j in range(k):
+            if max_run_count == v_values[j]:
+                frequencies[j] += 1
+        if max_run_count > v_values[k - 1]:
+            frequencies[k] += 1
+        block_start += m
+        block_end += m
+    # print(frequencies)
+    chi_squared = 0
+    for i in range(len(frequencies)):
+        chi_squared += (pow(frequencies[i] - (num_blocks * pik_values[i]), 2.0)) / (num_blocks * pik_values[i])
+    pVal = inc_gamma(float(k / 2), float(chi_squared / 2))
+    return pVal
+
 
 # HYBRID SOLVER
 
@@ -120,6 +175,7 @@ fValues = []
 fibValues = []
 runValues = []
 spectralValues = []
+longestRunValues = []
 
 #running multiple instances of generating random numbers and counting how many times each test runs successfully
 for i in range(50):
@@ -136,20 +192,24 @@ for i in range(50):
     fibValues.append(frequencyInBlock(best_sample.sample, 100))    
     runValues.append(runsTest(best_sample.sample))
     spectralValues.append(spectralTest(best_sample.sample))
+    longestRunValues.append(longestRunTest(best_sample.sample))
 fSum = 0.0
 fibSum = 0.0
 runSum = 0.0
 spectralSum = 0.0
+longestRunSum = 0.0
 for i in range(len(fValues)):
     fSum += fValues[i]
     fibSum += fibValues[i]
     runSum += runValues[i]
     spectralSum += spectralValues[i]
+    longestRunSum += longestRunValues[i]
 
 avgFValue = fSum/50
 avgFibValue = fibSum/50
 avgRunValue = runSum/50
 avgSpectralValue = spectralSum/50
+avgLongestRun = longestRunSum/50
 
 if avgFValue > 0.01:
     print("We have concluded that the random generator does generate random numbers based on the results of the Frequency test")
@@ -164,9 +224,15 @@ if avgRunValue > 0.01:
 else:
     print("We have concluded that the random generator does not generate random numbers based on the results of the Runs Test")
 if avgSpectralValue > 0.01:
-    print("We have concluded that the ranodm generator does generate random numbers based on the results of the Spectral Test")
+    print("We have concluded that the random generator does generate random numbers based on the results of the Spectral Test")
 else:
     print("We have concluded that the random generator does not generate random numbers based on the results of the Spectral Test")
+if avgLongestRun > 0.01:
+    print("We have concluded that the random generator does generate random numbers based on the results of the Longest Run of Ones Test")
+else:
+    print("We have concluded that the random generator does not generate random numbers based on the results of the Longest Run of Ones Test")
+
+
 
 # sum = 0
 # for i in range(len(best_sample.sample)):
