@@ -7,6 +7,11 @@ from scipy.special import gamma, gammaincc, exp1
 from scipy.fftpack import fft
 from collections import OrderedDict
 from itertools import product
+import scipy.stats as stats
+from scipy.stats import chi2
+from scipy.special import erfc
+import numpy as np
+
 
 import dwavebinarycsp as dbc
 from dwave.system import DWaveSampler, EmbeddingComposite
@@ -155,6 +160,134 @@ def longestRunTest(dictionary):
         chi_squared += (pow(frequencies[i] - (num_blocks * pik_values[i]), 2.0)) / (num_blocks * pik_values[i])
     pVal = inc_gamma(float(k / 2), float(chi_squared / 2))
     return pVal
+
+# Test 6
+# Define your binary sequence (ε)
+epsilon = "1100100100001111110110101010001000100001011010001100001000110100110001001100011000110010100010111000"
+
+# Length of the sequence
+n = len(epsilon)
+
+# Convert the binary sequence to a sequence of ±1 values
+sequence = [2 * int(bit) - 1 for bit in epsilon]
+
+# Calculate the Discrete Fourier Transform (DFT)
+dft_result = fft(sequence)
+
+# Calculate the modulus of the DFT result for the first half of the sequence
+modulus_dft = np.abs(dft_result[:n // 2])
+
+# Calculate the threshold value T for the 95% peak heights
+threshold = np.percentile(modulus_dft, 95)
+
+# Calculate the observed number of peaks that are less than the threshold
+observed_peaks = np.sum(modulus_dft < threshold)
+
+# Calculate the expected number of peaks under the assumption of randomness
+expected_peaks = 0.95 * n / 2
+
+# Calculate the normalized difference (d)
+d = (observed_peaks - expected_peaks) / np.sqrt(n * 0.95 * 0.05 / 4)
+
+# Calculate the P-value using the complementary error function (erfc)
+p_value = erfc(np.abs(d))
+
+# Define the significance level (1%)
+alpha = 0.01
+
+# Perform the test and make a conclusion
+if p_value < alpha:
+    conclusion = "Non-random"
+else:
+    conclusion = "Random"
+
+# Output the results
+print(f"Test Statistic (d): {d}")
+print(f"P-value: {p_value}")
+print(f"Conclusion: The sequence is {conclusion}")
+
+
+# seventh test
+
+# Define your binary sequence (ε)
+epsilon = "your_binary_sequence_here"
+n = len(epsilon)
+
+# Define the template B
+B = "your_template_here"
+m = len(B)
+
+# Partition the sequence into blocks (adjust the block size if needed)
+block_size = m
+N = n // block_size
+
+# Count the number of template matches in each block
+template_count = []
+for i in range(N):
+    block = epsilon[i * block_size : (i + 1) * block_size]
+    count = block.count(B)
+    template_count.append(count)
+
+# Calculate expected mean and variance
+mu = (block_size - m + 1) / (2**m)
+sigma2 = block_size / (2**(2 * m))
+
+# Compute the test statistic (χ^2)
+chi_squared = sum(((count - mu) ** 2) / sigma2 for count in template_count)
+
+# Calculate P-value
+p_value = 1 - chi2.cdf(chi_squared, N - 1)
+
+# Define the significance level (1%)
+alpha = 0.01
+
+# Perform the test and make a conclusion
+if p_value < alpha:
+    conclusion = "Non-random"
+else:
+    conclusion = "Random"
+
+# Output the results
+print(f"Test Statistic (χ^2): {chi_squared}")
+print(f"P-value: {p_value}")
+print(f"Conclusion: The sequence is {conclusion}")
+
+
+#8th test 
+
+def overlapping_template_matching_test(binary_sequence, template):
+    # Count occurrences of the template in the binary sequence
+    counts = []
+    pattern_len = len(template)
+    for i in range(len(binary_sequence) - pattern_len + 1):
+        window = binary_sequence[i:i + pattern_len]
+        if window == template:
+            counts.append(1)
+        else:
+            counts.append(0)
+
+    # Calculate test statistics
+    observed_counts = counts.count(1)
+    expected_counts = len(binary_sequence) / pattern_len
+    chi_square = sum([(count - expected_counts) ** 2 / expected_counts for count in counts])
+
+    # Calculate P-value using the chi-squared distribution
+    df = len(counts) - 1  # degrees of freedom
+    p_value = 1 - stats.chi2.cdf(chi_square, df)
+
+    return p_value
+
+# Example usage:
+binary_sequence = "10111011110010110100011100101110111110000101101001"
+template = "111111111"
+p_value = overlapping_template_matching_test(binary_sequence, template)
+print(f"P-value: {p_value}")
+
+# Decide if the sequence is random or non-random based on the P-value
+if p_value < 0.01:
+    print("Non-random")
+else:
+    print("Random")
 
 
 # HYBRID SOLVER
