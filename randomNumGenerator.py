@@ -3,7 +3,8 @@ import time
 import logging
 import functools
 import math
-from scipy.special import gamma, gammaincc, exp1
+import matplotlib.pyplot as plt
+from scipy.special import gamma, gammaincc, exp1, hyp1f1
 from scipy.fftpack import fft
 from collections import OrderedDict
 from itertools import product
@@ -40,27 +41,32 @@ def frequencyTest(dictionary):
     return pVal
 
 # second test
-def frequencyInBlock(dictionary, blockSize):
-    if blockSize == 1:
-        frequencyTest(dictionary)
-    numBlocks = math.floor(len(dictionary) / blockSize)
-    blockStart, blockEnd = 0, blockSize
-    proportionSum = 0.0
-    for i in range(numBlocks):
-        blockData = ""
-        for i in range(blockStart, blockEnd):
-            blockData = blockData + str(dictionary['x['+str(i)+']'])
-        onesCount = 0
-        for char in blockData:
+def frequencyInBlock(dictionary):
+    block_size = 128
+    bin_data = ""
+    for i in range(len(dictionary)):
+        bin_data = bin_data + str(dictionary['x['+str(i)+']'])
+    num_blocks = math.floor(len(bin_data) / block_size)
+    block_start, block_end = 0, block_size
+    # Keep track of the proportion of ones per block
+    proportion_sum = 0.0
+    for i in range(num_blocks):
+        # Slice the binary string into a block
+        block_data = bin_data[block_start:block_end]
+        # Keep track of the number of ones
+        ones_count = 0
+        for char in block_data:
             if char == '1':
-                onesCount += 1
-        pi = onesCount / blockSize
-        proportionSum += pow(pi - 0.5, 2.0)
-        blockStart += blockSize
-        blockEnd += blockSize
-    chiSquared = 4.0 * blockSize * proportionSum
-    pVal = inc_gamma(numBlocks / 2, chiSquared / 2)
-    return pVal
+                ones_count += 1
+        pi = ones_count / block_size
+        proportion_sum += pow(pi - 0.5, 2.0)
+        # Update the slice locations
+        block_start += block_size
+        block_end += block_size
+    # Calculate the p-value
+    chi_squared = 4.0 * block_size * proportion_sum
+    p_val = inc_gamma(num_blocks / 2, chi_squared / 2)
+    return p_val
 
 # third test
 def runsTest(dictionary):
@@ -81,32 +87,7 @@ def runsTest(dictionary):
     pVal = math.erf((abs(sum - 2*len(dictionary) * pi * (1-pi) ))/(2 * math.sqrt(len(dictionary)) * pi*(1-pi)))
     return pVal
 
-
 #fourth test
-def spectralTest(dictionary):
-    bin_data = ""
-    for i in range(len(dictionary)):
-        bin_data = bin_data + str(dictionary['x['+str(i)+']'])
-    n = len(bin_data)
-    plus_minus_one = []
-    for char in bin_data:
-        if char == '0':
-            plus_minus_one.append(-1)
-        elif char == '1':
-            plus_minus_one.append(1)
-    # Product discrete fourier transform of plus minus one
-    s = fft(plus_minus_one)
-    modulus = numpy.abs(s[0:int(n/2)])
-    tau = numpy.sqrt(numpy.log(1 / 0.05) * n)
-    # Theoretical number of peaks
-    count_n0 = 0.95 * (n / 2)
-    # Count the number of actual peaks m > T
-    count_n1 = len(numpy.where(modulus < tau)[0])
-    # Calculate d and return the p value statistic
-    d = (count_n1 - count_n0) / numpy.sqrt(n * 0.95 * 0.05 / 4)
-    pVal = math.erf(abs(d) / numpy.sqrt(2))
-    return pVal
-
 def longestRunTest(dictionary):
     bin_data = ""
     for i in range(len(dictionary)):
@@ -161,133 +142,110 @@ def longestRunTest(dictionary):
     pVal = inc_gamma(float(k / 2), float(chi_squared / 2))
     return pVal
 
-# Test 6
-# Define your binary sequence (ε)
-epsilon = "1100100100001111110110101010001000100001011010001100001000110100110001001100011000110010100010111000"
 
-# Length of the sequence
-n = len(epsilon)
-
-# Convert the binary sequence to a sequence of ±1 values
-sequence = [2 * int(bit) - 1 for bit in epsilon]
-
-# Calculate the Discrete Fourier Transform (DFT)
-dft_result = fft(sequence)
-
-# Calculate the modulus of the DFT result for the first half of the sequence
-modulus_dft = np.abs(dft_result[:n // 2])
-
-# Calculate the threshold value T for the 95% peak heights
-threshold = np.percentile(modulus_dft, 95)
-
-# Calculate the observed number of peaks that are less than the threshold
-observed_peaks = np.sum(modulus_dft < threshold)
-
-# Calculate the expected number of peaks under the assumption of randomness
-expected_peaks = 0.95 * n / 2
-
-# Calculate the normalized difference (d)
-d = (observed_peaks - expected_peaks) / np.sqrt(n * 0.95 * 0.05 / 4)
-
-# Calculate the P-value using the complementary error function (erfc)
-p_value = erfc(np.abs(d))
-
-# Define the significance level (1%)
-alpha = 0.01
-
-# Perform the test and make a conclusion
-if p_value < alpha:
-    conclusion = "Non-random"
-else:
-    conclusion = "Random"
-
-# Output the results
-print(f"Test Statistic (d): {d}")
-print(f"P-value: {p_value}")
-print(f"Conclusion: The sequence is {conclusion}")
-
+#sixth test
+def spectralTest(dictionary):
+    bin_data = ""
+    for i in range(len(dictionary)):
+        bin_data = bin_data + str(dictionary['x['+str(i)+']'])
+    n = len(bin_data)
+    plus_minus_one = []
+    for char in bin_data:
+        if char == '0':
+            plus_minus_one.append(-1)
+        elif char == '1':
+            plus_minus_one.append(1)
+    # Product discrete fourier transform of plus minus one
+    s = fft(plus_minus_one)
+    modulus = numpy.abs(s[0:int(n/2)])
+    tau = numpy.sqrt(numpy.log(1 / 0.05) * n)
+    # Theoretical number of peaks
+    count_n0 = 0.95 * (n / 2)
+    # Count the number of actual peaks m > T
+    count_n1 = len(numpy.where(modulus < tau)[0])
+    # Calculate d and return the p value statistic
+    d = (count_n1 - count_n0) / numpy.sqrt(n * 0.95 * 0.05 / 4)
+    pVal = math.erf(abs(d) / numpy.sqrt(2))
+    return pVal
 
 # seventh test
 
-# Define your binary sequence (ε)
-epsilon = "your_binary_sequence_here"
-n = len(epsilon)
+def nonOverlap(dictionary, template):
+    bin_data = ""
+    for i in range(len(dictionary)):
+        bin_data = bin_data + str(dictionary['x['+str(i)+']'])
+    n = len(bin_data)
 
-# Define the template B
-B = "your_template_here"
-m = len(B)
+    B = template
+    m = len(template)
+    blockSize = m
+    N = n // blockSize
 
-# Partition the sequence into blocks (adjust the block size if needed)
-block_size = m
-N = n // block_size
+    templateCount = []
+    for i in range(N):
+        block = bin_data[i * blockSize : (i + 1) * blockSize]
+        count = block.count(B)
+        templateCount.append(count)
 
-# Count the number of template matches in each block
-template_count = []
-for i in range(N):
-    block = epsilon[i * block_size : (i + 1) * block_size]
-    count = block.count(B)
-    template_count.append(count)
+    mu = (blockSize - m + 1) / (2**m)
+    sigma2 = blockSize / (2**(2 * m))
 
-# Calculate expected mean and variance
-mu = (block_size - m + 1) / (2**m)
-sigma2 = block_size / (2**(2 * m))
-
-# Compute the test statistic (χ^2)
-chi_squared = sum(((count - mu) ** 2) / sigma2 for count in template_count)
-
-# Calculate P-value
-p_value = 1 - chi2.cdf(chi_squared, N - 1)
-
-# Define the significance level (1%)
-alpha = 0.01
-
-# Perform the test and make a conclusion
-if p_value < alpha:
-    conclusion = "Non-random"
-else:
-    conclusion = "Random"
-
-# Output the results
-print(f"Test Statistic (χ^2): {chi_squared}")
-print(f"P-value: {p_value}")
-print(f"Conclusion: The sequence is {conclusion}")
+    chi_squared = sum(((count - mu) ** 2) / sigma2 for count in templateCount)
+    pVal = 1 - chi2.cdf(chi_squared, N -1)
+    return pVal
 
 
-#8th test 
+# #8th test 
 
-def overlapping_template_matching_test(binary_sequence, template):
-    # Count occurrences of the template in the binary sequence
-    counts = []
-    pattern_len = len(template)
-    for i in range(len(binary_sequence) - pattern_len + 1):
-        window = binary_sequence[i:i + pattern_len]
-        if window == template:
-            counts.append(1)
+def overlappingTemplate(dictionary):
+    pattern_size = 9
+    block_size = 1032
+    bin_data = ""
+    for i in range(len(dictionary)):
+        bin_data = bin_data + str(dictionary['x['+str(i)+']'])
+    n = len(bin_data)
+    pattern = ""
+    for i in range(pattern_size):
+        pattern += "1"
+    num_blocks = math.floor(n / block_size)
+    lambda_val = float(block_size - pattern_size + 1) / pow(2, pattern_size)
+    eta = lambda_val / 2.0
+
+    piks = [get_prob(i, eta) for i in range(5)]
+    diff = float(numpy.array(piks).sum())
+    piks.append(1.0 - diff)
+
+    pattern_counts = numpy.zeros(6)
+    for i in range(num_blocks):
+        block_start = i * block_size
+        block_end = block_start + block_size
+        block_data = bin_data[block_start:block_end]
+        # Count the number of pattern hits
+        pattern_count = 0
+        j = 0
+        while j < block_size:
+            sub_block = block_data[j:j + pattern_size]
+            if sub_block == pattern:
+                pattern_count += 1
+            j += 1
+        if pattern_count <= 4:
+            pattern_counts[pattern_count] += 1
         else:
-            counts.append(0)
+            pattern_counts[5] += 1
 
-    # Calculate test statistics
-    observed_counts = counts.count(1)
-    expected_counts = len(binary_sequence) / pattern_len
-    chi_square = sum([(count - expected_counts) ** 2 / expected_counts for count in counts])
+    chi_squared = 0.0
+    for i in range(len(pattern_counts)):
+        if(num_blocks * piks[i] == 0):
+            continue
+        else :
+            chi_squared += pow(pattern_counts[i] - num_blocks * piks[i], 2.0) / (num_blocks * piks[i])
+    return inc_gamma(5.0 / 2.0, chi_squared / 2.0)
 
-    # Calculate P-value using the chi-squared distribution
-    df = len(counts) - 1  # degrees of freedom
-    p_value = 1 - stats.chi2.cdf(chi_square, df)
-
-    return p_value
-
-# Example usage:
-binary_sequence = "10111011110010110100011100101110111110000101101001"
-template = "111111111"
-p_value = overlapping_template_matching_test(binary_sequence, template)
-print(f"P-value: {p_value}")
-
-# Decide if the sequence is random or non-random based on the P-value
-if p_value < 0.01:
-    print("Non-random")
-else:
-    print("Random")
+def get_prob(u, x):
+    out = 1.0 * numpy.exp(-x)
+    if u != 0:
+        out = 1.0 * x * numpy.exp(2 * -x) * (2 ** -u) * hyp1f1(u + 1, 2, x)
+    return out
 
 
 # HYBRID SOLVER
@@ -303,13 +261,25 @@ model = H.compile()
 qubo, offset = model.to_qubo()
 bqm = model.to_bqm()
 
+# sampler = LeapHybridSampler()
+# sampleset = sampler.sample(bqm,
+#                                  time_limit=3,
+#                                  label="QRNG TEST")
+
+# decoded_samples = model.decode_sampleset(sampleset)
+# # best sample is what holds all the binary values but also has the energy
+# best_sample = min(decoded_samples, key=lambda x: x.energy)
+# print(frequencyInBlock(best_sample.sample))
 
 fValues = []
 fibValues = []
 runValues = []
 spectralValues = []
 longestRunValues = []
-
+nonOverValues = []
+overValues = []
+# using template 000000001
+template = "000000001"
 #running multiple instances of generating random numbers and counting how many times each test runs successfully
 for i in range(50):
     sampler = LeapHybridSampler()
@@ -322,49 +292,78 @@ for i in range(50):
     best_sample = min(decoded_samples, key=lambda x: x.energy)
     # by taking best_sample.sample, we get the dictionary by itself and can analyze just the binary values
     fValues.append(frequencyTest(best_sample.sample))
-    fibValues.append(frequencyInBlock(best_sample.sample, 100))    
+    fibValues.append(frequencyInBlock(best_sample.sample))    
     runValues.append(runsTest(best_sample.sample))
     spectralValues.append(spectralTest(best_sample.sample))
     longestRunValues.append(longestRunTest(best_sample.sample))
+    nonOverValues.append(nonOverlap(best_sample.sample, template))
+    overValues.append(overlappingTemplate(best_sample.sample))
+
 fSum = 0.0
 fibSum = 0.0
 runSum = 0.0
 spectralSum = 0.0
 longestRunSum = 0.0
+nonOverlapSum = 0.0
+overSums = 0.0
+
 for i in range(len(fValues)):
     fSum += fValues[i]
     fibSum += fibValues[i]
     runSum += runValues[i]
     spectralSum += spectralValues[i]
     longestRunSum += longestRunValues[i]
+    nonOverlapSum += nonOverValues[i]
+    overSums += overValues[i]
 
 avgFValue = fSum/50
 avgFibValue = fibSum/50
 avgRunValue = runSum/50
 avgSpectralValue = spectralSum/50
 avgLongestRun = longestRunSum/50
+avgNonOver = nonOverlapSum/50
+avgOver = overSums/50
 
-if avgFValue > 0.01:
-    print("We have concluded that the random generator does generate random numbers based on the results of the Frequency test")
-else:
-    print("We have concluded that the random generator does not generate random numbers based on the results of the Frequency test.")
-if avgFibValue > 0.01:
-    print("We have concluded that the random generator does generate random numbers based on the results of the blocks test.")
-else:
-    print("We have concluded that the random generator does not generate random numbers based on the results of the block test.")
-if avgRunValue > 0.01:
-    print("We have concluded that the random generator does generate random numbers based on the results of the Runs Test")
-else:
-    print("We have concluded that the random generator does not generate random numbers based on the results of the Runs Test")
-if avgSpectralValue > 0.01:
-    print("We have concluded that the random generator does generate random numbers based on the results of the Spectral Test")
-else:
-    print("We have concluded that the random generator does not generate random numbers based on the results of the Spectral Test")
-if avgLongestRun > 0.01:
-    print("We have concluded that the random generator does generate random numbers based on the results of the Longest Run of Ones Test")
-else:
-    print("We have concluded that the random generator does not generate random numbers based on the results of the Longest Run of Ones Test")
+print(avgFValue)
+print(avgFibValue)
+print(avgRunValue)
+print(avgSpectralValue)
+print(avgLongestRun)
+print(avgNonOver)
+print(avgOver)
 
+# drawing the plot
+df = pd.DataFrame({
+    'group':'A',
+    'Frequency' : [avgFValue],
+    'Frequency in Block' : [avgFibValue],
+    'Runs' : [avgRunValue],
+    'Spectral' : [avgSpectralValue],
+    'Longest Run' : [avgLongestRun],
+    'Non Overlapping tmeplate' : [avgNonOver],
+    'Overlapping Template' : [avgOver]
+})
+
+categories = list(df)[1:]
+N = len(categories)
+
+values = df.loc[0].drop('group').values.flatten().tolist()
+values += values[:1]
+values
+
+angles = [n / float(N) * 2 * math.pi for n in range(N)]
+angles += angles[:1]
+
+ax = plt.subplot(111, polar = True)
+
+plt.xticks(angles[:-1], categories, color = 'grey', size = 8)
+
+plt.yticks([0.1,0.2,0.4,0.6,0.8], ["0.1", "0.2", "0.4", "0.6", "0.8"], color ='grey', size = 8)
+plt.ylim(0,1)
+
+ax.plot(angles, values, linewidth = 1, linestyle = 'solid')
+ax.fill(angles, values, 'b', alpha = 0.1)
+plt.show()
 
 
 # sum = 0
@@ -383,7 +382,7 @@ else:
 
 # lineup_df = pd.DataFrame(best_sample.sample.items())
 # lineup_df.columns = ['Variable', 'Selected']
-# lineup_df = players_df.merge(lineup_df, on=['Variable'])
+# # lineup_df = players_df.merge(lineup_df, on=['Variable'])
 # lineup_df.sort_values(by=['Variable'])
 # print(lineup_df)
 # numstr = ''
