@@ -500,7 +500,7 @@ avgEntropy = entropySums/1
 
 # drawing the plot
 df = pd.DataFrame({
-    # 'group':'A',
+    'group':'A',
     'Frequency' : [avgFValue],
     'Frequency in Block' : [avgFibValue],
     'Runs' : [avgRunValue],
