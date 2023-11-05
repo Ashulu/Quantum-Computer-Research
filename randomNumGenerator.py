@@ -359,6 +359,45 @@ def serial(dictionary):
         # I am not sure if this is correct, but it makes sense to me.
         return min(p_val_one, p_val_two)
 
+
+#tenth test
+def entropy(dictionary):
+    pattern_length = 10
+    bin_data = ""
+    for i in range(len(dictionary)):
+        bin_data = bin_data + str(dictionary['x['+str(i)+']'])
+    n = len(bin_data)
+    # Add first m+1 bits to the end
+    # NOTE: documentation says m-1 bits but that doesnt make sense, or work.
+    bin_data += bin_data[:pattern_length + 1:]
+
+    # Get max length one patterns for m, m-1, m-2
+    max_pattern = ''
+    for i in range(pattern_length + 2):
+        max_pattern += '1'
+
+    # Keep track of each pattern's frequency (how often it appears)
+    vobs_one = numpy.zeros(int(max_pattern[0:pattern_length:], 2) + 1)
+    vobs_two = numpy.zeros(int(max_pattern[0:pattern_length + 1:], 2) + 1)
+
+    for i in range(n):
+        # Work out what pattern is observed
+        vobs_one[int(bin_data[i:i + pattern_length:], 2)] += 1
+        vobs_two[int(bin_data[i:i + pattern_length + 1:], 2)] += 1
+
+    # Calculate the test statistics and p values
+    vobs = [vobs_one, vobs_two]
+    sums = numpy.zeros(2)
+    for i in range(2):
+        for j in range(len(vobs[i])):
+            if vobs[i][j] > 0:
+                sums[i] += vobs[i][j] * math.log(vobs[i][j] / n)
+    sums /= n
+    ape = sums[0] - sums[1]
+    chi_squared = 2.0 * n * (math.log(2) - ape)
+    p_val = inc_gamma(pow(2, pattern_length-1), chi_squared/2.0)
+    return p_val
+
 # HYBRID SOLVER
 
 # trying this with 1024 qubits, which has a minimum of 3 seconds annealing time : 42.666 bytes/s
@@ -391,6 +430,7 @@ nonOverValues = []
 overValues = []
 linearValues = []
 serialValues = []
+entropyValues = []
 
 # using template 000000001
 template = "000000001"
@@ -414,6 +454,7 @@ for i in range(1):
     overValues.append(overlappingTemplate(best_sample.sample))
     linearValues.append(linear_complexity(best_sample.sample))
     serialValues.append(serial(best_sample.sample))
+    entropyValues.append(entropy(best_sample.sample))
 
 fSum = 0.0
 fibSum = 0.0
@@ -424,6 +465,7 @@ nonOverlapSum = 0.0
 overSums = 0.0
 linearSums = 0.0
 serialSums = 0.0
+entropySums = 0.0
 
 for i in range(len(fValues)):
     fSum += fValues[i]
@@ -435,6 +477,7 @@ for i in range(len(fValues)):
     overSums += overValues[i]
     linearSums += linearValues[i]
     serialSums += serialValues[i]
+    entropySums += entropyValues[i]
 
 avgFValue = fSum/1
 avgFibValue = fibSum/1
@@ -445,6 +488,7 @@ avgNonOver = nonOverlapSum/1
 avgOver = overSums/1
 avgLinear = linearSums/1
 avgSerial = serialSums/1
+avgEntropy = entropySums/1
 
 # print(avgFValue)
 # print(avgFibValue)
@@ -465,7 +509,8 @@ df = pd.DataFrame({
     'Non Overlapping tmeplate' : [avgNonOver],
     'Overlapping Template' : [avgOver],
     "Linear complexity test" : [avgLinear],
-    "Serial test" : [avgSerial]
+    "Serial test" : [avgSerial],
+    "Approximate Entropy test" : [avgEntropy]
 })
 
 categories = list(df)[1:]
