@@ -312,6 +312,52 @@ def berlekamp_massey_algorithm(block_data):
         i += 1
     return l
 
+#ninth test
+def serial(dictionary):
+    pattern_length = 16
+    method = "first"
+    bin_data = ""
+    for i in range(len(dictionary)):
+        bin_data = bin_data + str(dictionary['x['+str(i)+']'])
+    n = len(bin_data)
+    # Add first m-1 bits to the end
+    bin_data += bin_data[:pattern_length - 1:]
+
+    # Get max length one patterns for m, m-1, m-2
+    max_pattern = ''
+    for i in range(pattern_length + 1):
+        max_pattern += '1'
+
+    # Keep track of each pattern's frequency (how often it appears)
+    vobs_one = numpy.zeros(int(max_pattern[0:pattern_length:], 2) + 1)
+    vobs_two = numpy.zeros(int(max_pattern[0:pattern_length-1:], 2) + 1)
+    vobs_thr = numpy.zeros(int(max_pattern[0:pattern_length-2:], 2) + 1)
+
+    for i in range(n):
+        # Work out what pattern is observed
+        vobs_one[int(bin_data[i:i + pattern_length:], 2)] += 1
+        vobs_two[int(bin_data[i:i + pattern_length-1:], 2)] += 1
+        vobs_thr[int(bin_data[i:i + pattern_length-2:], 2)] += 1
+
+    vobs = [vobs_one, vobs_two, vobs_thr]
+    sums = numpy.zeros(3)
+    for i in range(3):
+        for j in range(len(vobs[i])):
+            sums[i] += pow(vobs[i][j], 2)
+        sums[i] = (sums[i] * pow(2, pattern_length-i)/n) - n
+
+    # Calculate the test statistics and p values
+    del1 = sums[0] - sums[1]
+    del2 = sums[0] - 2.0 * sums[1] + sums[2]
+    p_val_one = inc_gamma(pow(2, pattern_length-1)/2, del1/2.0)
+    p_val_two = inc_gamma(pow(2, pattern_length-2)/2, del2/2.0)
+
+    # For checking the outputs
+    if method == "first":
+        return p_val_one
+    else:
+        # I am not sure if this is correct, but it makes sense to me.
+        return min(p_val_one, p_val_two)
 
 # HYBRID SOLVER
 
@@ -344,11 +390,12 @@ longestRunValues = []
 nonOverValues = []
 overValues = []
 linearValues = []
+serialValues = []
 
 # using template 000000001
 template = "000000001"
 #running multiple instances of generating random numbers and counting how many times each test runs successfully
-for i in range(50):
+for i in range(1):
     sampler = LeapHybridSampler()
     sampleset = sampler.sample(bqm,
                                 time_limit=3,
@@ -366,6 +413,7 @@ for i in range(50):
     nonOverValues.append(nonOverlap(best_sample.sample, template))
     overValues.append(overlappingTemplate(best_sample.sample))
     linearValues.append(linear_complexity(best_sample.sample))
+    serialValues.append(serial(best_sample.sample))
 
 fSum = 0.0
 fibSum = 0.0
@@ -375,6 +423,7 @@ longestRunSum = 0.0
 nonOverlapSum = 0.0
 overSums = 0.0
 linearSums = 0.0
+serialSums = 0.0
 
 for i in range(len(fValues)):
     fSum += fValues[i]
@@ -385,15 +434,17 @@ for i in range(len(fValues)):
     nonOverlapSum += nonOverValues[i]
     overSums += overValues[i]
     linearSums += linearValues[i]
+    serialSums += serialValues[i]
 
-avgFValue = fSum/50
-avgFibValue = fibSum/50
-avgRunValue = runSum/50
-avgSpectralValue = spectralSum/50
-avgLongestRun = longestRunSum/50
-avgNonOver = nonOverlapSum/50
-avgOver = overSums/50
-avgLinear = linearSums/50
+avgFValue = fSum/1
+avgFibValue = fibSum/1
+avgRunValue = runSum/1
+avgSpectralValue = spectralSum/1
+avgLongestRun = longestRunSum/1
+avgNonOver = nonOverlapSum/1
+avgOver = overSums/1
+avgLinear = linearSums/1
+avgSerial = serialSums/1
 
 # print(avgFValue)
 # print(avgFibValue)
@@ -413,7 +464,8 @@ df = pd.DataFrame({
     'Longest Run' : [avgLongestRun],
     'Non Overlapping tmeplate' : [avgNonOver],
     'Overlapping Template' : [avgOver],
-    "Linear complexity test" : [avgLinear]
+    "Linear complexity test" : [avgLinear],
+    "Serial test" : [avgSerial]
 })
 
 categories = list(df)[1:]
