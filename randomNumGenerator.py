@@ -4,6 +4,7 @@ import logging
 import functools
 import math
 import matplotlib.pyplot as plt
+import copy
 from scipy.special import gamma, gammaincc, exp1, hyp1f1
 from scipy.fftpack import fft
 from collections import OrderedDict
@@ -143,7 +144,7 @@ def longestRunTest(dictionary):
     return pVal
 
 
-#sixth test
+#fifth test
 def spectralTest(dictionary):
     bin_data = ""
     for i in range(len(dictionary)):
@@ -168,7 +169,7 @@ def spectralTest(dictionary):
     pVal = math.erf(abs(d) / numpy.sqrt(2))
     return pVal
 
-# seventh test
+# sixth test
 
 def nonOverlap(dictionary, template):
     bin_data = ""
@@ -195,7 +196,7 @@ def nonOverlap(dictionary, template):
     return pVal
 
 
-# #8th test 
+# seventh test 
 
 def overlappingTemplate(dictionary):
     pattern_size = 9
@@ -247,6 +248,70 @@ def get_prob(u, x):
         out = 1.0 * x * numpy.exp(2 * -x) * (2 ** -u) * hyp1f1(u + 1, 2, x)
     return out
 
+#eighth test
+def linear_complexity(dictionary):
+    block_size = 500
+    bin_data = ""
+    for i in range(len(dictionary)):
+        bin_data = bin_data + str(dictionary['x['+str(i)+']'])
+    dof = 6
+    piks = [0.01047, 0.03125, 0.125, 0.5, 0.25, 0.0625, 0.020833]
+
+    t2 = (block_size / 3.0 + 2.0 / 9) / 2 ** block_size
+    mean = 0.5 * block_size + (1.0 / 36) * (9 + (-1) ** (block_size + 1)) - t2
+
+    num_blocks = int(len(bin_data) / block_size)
+    if num_blocks > 1:
+        block_end = block_size
+        block_start = 0
+        blocks = []
+        for i in range(num_blocks):
+            blocks.append(bin_data[block_start:block_end])
+            block_start += block_size
+            block_end += block_size
+
+        complexities = []
+        for block in blocks:
+            complexities.append(berlekamp_massey_algorithm(block))
+
+        t = ([-1.0 * (((-1) ** block_size) * (chunk - mean) + 2.0 / 9) for chunk in complexities])
+        vg = numpy.histogram(t, bins=[-9999999999, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 9999999999])[0][::-1]
+        im = ([((vg[ii] - num_blocks * piks[ii]) ** 2) / (num_blocks * piks[ii]) for ii in range(7)])
+
+        chi_squared = 0.0
+        for i in range(len(piks)):
+            chi_squared += im[i]
+        p_val = inc_gamma(dof / 2.0, chi_squared / 2.0)
+        return p_val
+    else:
+        return -1.0
+    
+def berlekamp_massey_algorithm(block_data):
+    n = len(block_data)
+    c = numpy.zeros(n)
+    b = numpy.zeros(n)
+    c[0], b[0] = 1, 1
+    l, m, i = 0, -1, 0
+    int_data = [int(el) for el in block_data]
+    while i < n:
+        v = int_data[(i - l):i]
+        v = v[::-1]
+        cc = c[1:l + 1]
+        d = (int_data[i] + numpy.dot(v, cc)) % 2
+        if d == 1:
+            temp = copy.copy(c)
+            p = numpy.zeros(n)
+            for j in range(0, l):
+                if b[j] == 1:
+                    p[j + i - m] = 1
+            c = (c + p) % 2
+            if l <= 0.5 * i:
+                l = i + 1 - l
+                m = i
+                b = temp
+        i += 1
+    return l
+
 
 # HYBRID SOLVER
 
@@ -278,6 +343,8 @@ spectralValues = []
 longestRunValues = []
 nonOverValues = []
 overValues = []
+linearValues = []
+
 # using template 000000001
 template = "000000001"
 #running multiple instances of generating random numbers and counting how many times each test runs successfully
@@ -298,6 +365,7 @@ for i in range(50):
     longestRunValues.append(longestRunTest(best_sample.sample))
     nonOverValues.append(nonOverlap(best_sample.sample, template))
     overValues.append(overlappingTemplate(best_sample.sample))
+    linearValues.append(linear_complexity(best_sample.sample))
 
 fSum = 0.0
 fibSum = 0.0
@@ -306,6 +374,7 @@ spectralSum = 0.0
 longestRunSum = 0.0
 nonOverlapSum = 0.0
 overSums = 0.0
+linearSums = 0.0
 
 for i in range(len(fValues)):
     fSum += fValues[i]
@@ -315,6 +384,7 @@ for i in range(len(fValues)):
     longestRunSum += longestRunValues[i]
     nonOverlapSum += nonOverValues[i]
     overSums += overValues[i]
+    linearSums += linearValues[i]
 
 avgFValue = fSum/50
 avgFibValue = fibSum/50
@@ -323,14 +393,15 @@ avgSpectralValue = spectralSum/50
 avgLongestRun = longestRunSum/50
 avgNonOver = nonOverlapSum/50
 avgOver = overSums/50
+avgLinear = linearSums/50
 
-print(avgFValue)
-print(avgFibValue)
-print(avgRunValue)
-print(avgSpectralValue)
-print(avgLongestRun)
-print(avgNonOver)
-print(avgOver)
+# print(avgFValue)
+# print(avgFibValue)
+# print(avgRunValue)
+# print(avgSpectralValue)
+# print(avgLongestRun)
+# print(avgNonOver)
+# print(avgOver)
 
 # drawing the plot
 df = pd.DataFrame({
@@ -341,7 +412,8 @@ df = pd.DataFrame({
     'Spectral' : [avgSpectralValue],
     'Longest Run' : [avgLongestRun],
     'Non Overlapping tmeplate' : [avgNonOver],
-    'Overlapping Template' : [avgOver]
+    'Overlapping Template' : [avgOver],
+    "Linear complexity test" : [avgLinear]
 })
 
 categories = list(df)[1:]
