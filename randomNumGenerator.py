@@ -500,7 +500,7 @@ avgEntropy = entropySums/1
 
 # drawing the plot
 df = pd.DataFrame({
-    'group':'A',
+    # 'group':'A',
     'Frequency' : [avgFValue],
     'Frequency in Block' : [avgFibValue],
     'Runs' : [avgRunValue],
@@ -513,7 +513,7 @@ df = pd.DataFrame({
     "Approximate Entropy test" : [avgEntropy]
 })
 
-categories = list(df)[1:]
+categories = list(df)[0:]
 N = len(categories)
 
 values = df.loc[0].drop('group').values.flatten().tolist()
