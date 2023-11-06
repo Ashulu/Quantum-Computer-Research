@@ -10,7 +10,7 @@ from scipy.fftpack import fft
 from collections import OrderedDict
 from itertools import product
 import scipy.stats as stats
-from scipy.stats import chi2
+from scipy.stats import chi2, norm
 from scipy.special import erfc
 import numpy as np
 
@@ -399,8 +399,6 @@ def entropy(dictionary):
     return p_val
 
 #eleventh test
-from scipy.stats import chi2
-
 def Serial(m, n, epsilon):
     # Step 1: Form an augmented sequence ε'
     augmented_sequence = epsilon + epsilon[:m - 1]
@@ -436,6 +434,91 @@ def Serial(m, n, epsilon):
         conclusion = "Random"
 
     return p_value1, p_value2, conclusion
+
+#twelfth test
+def ApproximateEntropy(m, n, epsilon):
+    # Step 1: Augment the n-bit sequence
+    augmented_sequences = [epsilon[i:i + m] + epsilon[:m - 1] for i in range(n)]
+    
+    # Initialize dictionaries to count m-bit and (m+1)-bit values
+    C_m = {}
+    C_m_plus_1 = {}
+
+    for sequence in augmented_sequences:
+        m_bit_value = sequence[:m]
+        m_plus_1_bit_value = sequence[:m + 1]
+
+        if m_bit_value in C_m:
+            C_m[m_bit_value] += 1
+        else:
+            C_m[m_bit_value] = 1
+
+        if m_plus_1_bit_value in C_m_plus_1:
+            C_m_plus_1[m_plus_1_bit_value] += 1
+        else:
+            C_m_plus_1[m_plus_1_bit_value] = 1
+
+    # Step 3: Compute ϕ for m and m+1
+    phi_m = 0
+    phi_m_plus_1 = 0
+
+    for key in C_m:
+        pi = C_m[key] / n
+        phi_m += pi * math.log(pi, 2)
+
+    for key in C_m_plus_1:
+        pi_plus_1 = C_m_plus_1[key] / n
+        phi_m_plus_1 += pi_plus_1 * math.log(pi_plus_1, 2)
+
+    # Step 6: Compute the test statistic χ^2
+    ApEn = phi_m - phi_m_plus_1
+    chi_square = 2 * n * (math.log(2) - ApEn)
+
+    # Step 7: Compute P-value
+    df = 2 ** (m - 1)
+    p_value = chi2.sf(chi_square, df)
+
+    # Step 8: Decision Rule
+    if p_value < 0.01:
+        conclusion = "Non-random"
+    else:
+        conclusion = "Random"
+
+    return p_value, conclusion
+
+#thirteenth test
+def CumulativeSums(epsilon, mode):
+    n = len(epsilon)
+    
+    # Step 1: Form a normalized sequence
+    X = [2 * int(epsilon[i]) - 1 for i in range(n)]
+    
+    # Initialize variables
+    S = [0]
+    max_S = 0
+    
+    # Step 2: Compute partial sums
+    if mode == 0:  # Forward mode
+        for i in range(n):
+            S.append(S[-1] + X[i])
+    else:  # Reverse mode
+        for i in range(n - 1, -1, -1):
+            S.append(S[-1] + X[i])
+    
+    # Step 3: Compute the test statistic z
+    for s in S:
+        max_S = max(max_S, abs(s))
+    
+    # Step 4: Compute P-value
+    p_value = 1 - norm.cdf((4 * max_S + 1) / (n ** 0.5)) + norm.cdf((4 * max_S - 1) / (n ** 0.5))
+    
+    # Step 5: Decision Rule
+    if p_value < 0.01:
+        conclusion = "Non-random"
+    else:
+        conclusion = "Random"
+    
+    return p_value, conclusion
 
 
 # HYBRID SOLVER
