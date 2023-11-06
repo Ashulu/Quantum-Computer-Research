@@ -398,6 +398,46 @@ def entropy(dictionary):
     p_val = inc_gamma(pow(2, pattern_length-1), chi_squared/2.0)
     return p_val
 
+#eleventh test
+from scipy.stats import chi2
+
+def Serial(m, n, epsilon):
+    # Step 1: Form an augmented sequence ε'
+    augmented_sequence = epsilon + epsilon[:m - 1]
+
+    # Step 2: Determine the frequency of all possible overlapping m-bit blocks
+    m_bit_frequency = {}
+    for i in range(n):
+        m_bit_pattern = augmented_sequence[i:i + m]
+        if m_bit_pattern in m_bit_frequency:
+            m_bit_frequency[m_bit_pattern] += 1
+        else:
+            m_bit_frequency[m_bit_pattern] = 1
+
+    # Step 3: Compute ψ2_m
+    psi_m = 0.0
+    for pattern, frequency in m_bit_frequency.items():
+        psi_m += (frequency - n / (2 ** m)) ** 2
+
+    psi_m /= n / (2 ** m)
+
+    # Step 4: Compute ∇ψ
+    delta_psi = psi_m - (n / (2 ** m) - 1)
+
+    # Step 5: Compute P-values
+    df = 2 ** (m - 1)
+    p_value1 = chi2.sf(delta_psi, df)
+    p_value2 = chi2.sf(2 * delta_psi, df)
+
+    # Step 6: Decision Rule
+    if p_value1 < 0.01 or p_value2 < 0.01:
+        conclusion = "Non-random"
+    else:
+        conclusion = "Random"
+
+    return p_value1, p_value2, conclusion
+
+
 # HYBRID SOLVER
 
 # trying this with 1024 qubits, which has a minimum of 3 seconds annealing time : 42.666 bytes/s
